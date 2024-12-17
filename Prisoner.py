@@ -1,81 +1,40 @@
 # Prisoner RL Agent
-# Deep Q-learning Agent that takes the round number and the number of times the other agent has snitched as input
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
+import numpy as np
+# Q_table
+#              ACTIONS
+# OBSERV [_, _]
+# ATIONS [_, _]
 
-# Decision class that takes the number of rounds and the number of times the other agent has snitched as input
-# and returns the decision to snitch or not
-class Decision(nn.Module):
-    # Initialize the Decision class
-    def __init__(self):
-        super(Decision, self).__init__()
-        self.fc1 = nn.Linear(2, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 1)
+# Q_table 
+# Actions: 0 = Stay Silent, 1 = Snitch
+# States: Snitched on count, Round number
+class q_table_prisoner:
+    def __init__(self, n_actions=2, n_states= 2, alpha=0.1, gamma=0.6, epsilon=0.1):
+        # Probability distribution of actions for each state
+        self.q_table = np.zeros((n_actions, n_states))
 
-    # Forward pass of the Decision class
-    def forward(self, n_rounds, n_snitched):
-        # convert the inputs to a tensor
-        n_rounds = torch.tensor([n_rounds], dtype=torch.float32)
-        n_snitched = torch.tensor([n_snitched], dtype=torch.float32)
+        # Hyperparameters
+        self.alpha = alpha # Learning rate
+        self.gamma = gamma # Discount factor
+        self.epsilon = epsilon # Exploration rate
 
-        # concatenate the inputs
-        x = torch.cat((n_rounds, n_snitched), dim=0)
-        # pass the inputs through the network
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-# Prisoner class that takes the number of rounds as input
-# and returns the decision to snitch or not
-class Prisoner:
-    # Initialize the Prisoner class
-    def __init__(self, n_rounds):
-        self.n_rounds = n_rounds
-        self.decision = Decision()
-        self.optimizer = optim.Adam(self.decision.parameters(), lr=0.001)
-        self.gamma = 0.99
-        self.eps = 0.5
-
-    def reset(self):
-        self.eps = 0.5
-
-    # Act method that takes the number of rounds and the number of times the other agent has snitched as input
-    # and returns the decision to snitch or not
-    def act(self, observation):
-        self.n_rounds = observation[0]
-        self.n_snitched = observation[1]
-        # Epsilon-greedy policy
-        if torch.rand(1).item() < self.eps:
-            return torch.randint(0, 2, (1,))
-        else:
-            return torch.argmax(self.decision(self.n_rounds, self.n_rounds))
-
-    # Train method that takes the number of rounds, the number of times the other agent has snitched, the action,
-    # the reward, the number of rounds_, and the number of times the other agent has snitched_ as input
-    # and returns the loss
-    def train(self, observation_, reward):
-        n_rounds_ = observation_[0]
-        n_snitched_ = observation_[1]
-
-        # Compute the target
-        target = reward + self.gamma * torch.max(self.decision(n_rounds_, n_snitched_))
-        target = target.unsqueeze(0)
-
-        # Compute the loss
-        loss = F.mse_loss(self.decision(self.n_rounds, self.n_rounds), target)
-        # Optimize the Decision class
-        self.optimizer.zero_grad()
-        # Backward pass to compute the gradients
-        loss.backward()
-        # Update the weights
-        self.optimizer.step()
-
-        # Decay the epsilon
-        self.eps *= 0.99
+    # Choose an action based on the epsilon-greedy policy
+    def choose_action(self, state):
+        self.state = state
+        # Exploration
+        if np.random.uniform(0, 1) < self.epsilon:
+            self.action = np.random.choice(len(self.q_table))
         
-        return loss.item()
+        # Exploitation
+        else:
+            self.action = np.argmax(self.q_table[:, state])
+        
+        return self.action
+        
+    # Update the Q-table
+    def update(self, reward, next_state):
+        # Bellman equation
+        self.q_table[self.action, self.state] = self.q_table[self.action, self.state] + self.alpha * (reward + self.gamma * np.max(self.q_table[:, next_state]) - self.q_table[self.action, self.state])
+        # Reduce the exploration rate
+        self.epsilon = max(0.05, self.epsilon * 0.999)

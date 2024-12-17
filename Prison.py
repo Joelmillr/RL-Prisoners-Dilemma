@@ -16,18 +16,16 @@ class PrisonersDilemma(gym.Env):
     def __init__(self, n_rounds):
         self.n_rounds = n_rounds
         self.round = 0
-        self.action_space = gym.spaces.Discrete(2)
-        self.agent_actions = [0, 0]
-        self.observation_space_a = [gym.spaces.Discrete(n_rounds), gym.spaces.Discrete(n_rounds)]
-        self.observation_space_b = [gym.spaces.Discrete(n_rounds), gym.spaces.Discrete(n_rounds)]
-        self.reset()
+        self.agent_actions = [0, 0] # For rendering
+        self.observation_space_a = 0
+        self.observation_space_b = 0
 
     # Reset the environment
     def reset(self):
         self.round = 0
         self.agent_actions = [0,0]
-        self.observation_space_a = [0, 0]
-        self.observation_space_b = [0, 0]
+        self.observation_space_a = 0
+        self.observation_space_b = 0
 
         return (self.observation_space_a, self.observation_space_b)
 
@@ -50,20 +48,23 @@ class PrisonersDilemma(gym.Env):
             reward_a = -2
             reward_b = -2
 
+        # Store actions for rendering
         self.agent_actions = [action_a, action_b]
 
         # Store the actions of the other agent and the round number in the observation space
-        self.observation_space_a = [self.observation_space_a[0] + action_b, self.round+1]
-        self.observation_space_b = [self.observation_space_b[0] + action_a, self.round+1]
+        self.observation_space_a = action_b
+        self.observation_space_b = action_a
 
         # Increment the round number
         self.round += 1
 
         return (
-            (self.observation_space_a, self.observation_space_b),
-            (reward_a, reward_b),
+            self.round,
+            self.observation_space_a, 
+            self.observation_space_b,
+            reward_a, 
+            reward_b,
             self.round >= self.n_rounds,
-            {},
         )
 
     def render(self):
@@ -71,4 +72,3 @@ class PrisonersDilemma(gym.Env):
         print("Round:", self.round)
         print(f"Agent A {'snitched' if self.agent_actions[0] else 'stayed silent'}")
         print(f"Agent B {'snitched' if self.agent_actions[1] else 'stayed silent'}")
-        print()
